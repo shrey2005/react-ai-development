@@ -1,7 +1,7 @@
-export type AIStatus = 'idle' | 'pending' | 'success' | 'error';
+export type AIStatus = 'idle' | 'pending' | 'success' | 'error' | 'cancelled';
 
 export interface UseAIOptions {
-    endpoint: string;
+  endpoint: string;
 }
 
 export interface UseAIReturn<T> {
@@ -11,6 +11,8 @@ export interface UseAIReturn<T> {
   isPending: boolean;
   isSuccess: boolean;
   isError: boolean;
+  isCancelled: boolean;
   generate: (prompt: string) => Promise<void>;
   reset: () => void;
+  cancel: () => void;
 }
