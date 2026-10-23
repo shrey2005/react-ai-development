@@ -86,3 +86,86 @@ describe('useAI Phase 2', () => {
     })
 
 })
+
+describe("useAI Phase 3 retry", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it("retires on 500 and succeed", async () => {
+        fetch.mockResolvedValueOnce({ ok: false, status: 500 }).mockResolvedValueOnce({ ok: true, json: async () => ({ data: 'Success' }) });
+        const { result } = renderHook(() => useAI({ endpoint: '/api/ai', retry: 1, retryDelay: 10 }))
+
+        let promise = null
+        act(() => {
+            promise = result.current.generate("Hello");
+        })
+
+        await act(async () => {
+            await promise;
+        });
+
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(result.current.status).toBe('success');
+        expect(result.current.retryAttempt).toBe(1);
+        expect(result.current.data).toBe('Success');
+    });
+
+    it("exhausts retries and errors", async () => {
+        fetch.mockResolvedValue({ ok: false, status: 500 });
+
+        const { result } = renderHook(() => useAI({ endpoint: '/api/ai', retry: 2, retryDelay: 10 }));
+
+        let promise = null;
+        act(() => {
+            promise = result.current.generate("Hello");
+        })
+
+        await act(async () => {
+            await promise;
+        })
+
+        expect(fetch).toHaveBeenCalledTimes(3);
+        expect(result.current.status).toBe('error');
+        expect(result.current.retryAttempt).toBe(2);
+    })
+
+    it("does not retry 400 client errors", async () => {
+        fetch.mockResolvedValue({ ok: false, status: 400 })
+
+        const { result } = renderHook(() => useAI({ endpoint: '/api/ai', retry: 2, retryDelay: 10 }))
+
+        let promise = null;
+        act(() => {
+            promise = result.current.generate("Hello");
+        })
+
+        await act(async () => {
+            await promise;
+        })
+
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(result.current.status).toBe('error');
+        expect(result.current.retryAttempt).toBe(0);
+    })
+
+    it("aborts on timeout and skips retry", async () => {
+        fetch.mockResolvedValue({ ok: true, json: async () => ({ data: 'Late' }) })
+
+        const { result } = renderHook(() => useAI({ endpoint: '/api/ai', retry: 2, timeout: 50 }))
+
+        let promise = null;
+        act(() => {
+            promise = result.current.generate("Hello");
+        })
+
+        await act(async () => {
+            await promise;
+        })
+
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(result.current.status).toBe('error');
+        expect(result.current.error?.message).toBe('TIMEOUT_ERROR');
+        expect(result.current.retryAttempt).toBe(0);
+    })
+})
