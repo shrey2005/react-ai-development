@@ -4,7 +4,7 @@ import { AITimeoutError } from './errors';
 
 const isRetriableError = (status?: number) => {
   if (!status) return true;
-  return [400, 429, 500, 502, 503, 504].includes(status);
+  return [408, 429, 500, 502, 503, 504].includes(status);
 };
 
 const delay = (ms: number, signal: AbortSignal): Promise<void> => {
@@ -29,6 +29,7 @@ export function useAI<T>(options: UseAIOptions): UseAIReturn<T> {
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
       abortControllerRef.current = null;
+      setStatus('cancelled');
     }
   }, []);
 
@@ -41,6 +42,7 @@ export function useAI<T>(options: UseAIOptions): UseAIReturn<T> {
   const generate = useCallback(async (prompt: string) => {
     cancel();
 
+    setData(null);
     setStatus('pending');
     setError(null);
     setIsTimeout(false);
@@ -67,7 +69,10 @@ export function useAI<T>(options: UseAIOptions): UseAIReturn<T> {
         const res = await fetch(options.endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt }),
+          body: JSON.stringify({
+            prompt,
+            ...(options.streaming !== undefined ? { streaming: options.streaming } : {}),
+          }),
           signal: controller.signal,
         });
 
@@ -75,7 +80,58 @@ export function useAI<T>(options: UseAIOptions): UseAIReturn<T> {
         if (timeoutId !== null) clearTimeout(timeoutId);
 
         if (!res.ok) {
-          throw new Error(`HTTP_ERROR: ${res.status}`);
+          const httpErr = new Error(`HTTP_ERROR: ${res.status}`);
+          (httpErr as any).status = res.status;
+          throw httpErr;
+        }
+
+        if (options.streaming) {
+          if (!res.body) {
+            throw new Error('Response body is null');
+          }
+          const reader = res.body.getReader();
+          const decoder = new TextDecoder();
+          setStatus('streaming');
+
+          const abortHandler = () => {
+            try {
+              reader.cancel();
+            } catch (_) {}
+          };
+          controller.signal.addEventListener('abort', abortHandler, { once: true });
+
+          try {
+            while (true) {
+              if (controller.signal.aborted) break;
+              const { done, value } = await reader.read();
+              if (done || controller.signal.aborted) break;
+
+              const chunk = decoder.decode(value, { stream: true });
+              setData((prev: any) => ((prev || '') + chunk) as T);
+              setStatus('streaming');
+            }
+          } catch (readErr: unknown) {
+            if (
+              (readErr as any)?.name === 'AbortError' ||
+              controller.signal.aborted
+            ) {
+              setStatus('cancelled');
+              abortControllerRef.current = null;
+              return;
+            }
+            throw readErr;
+          } finally {
+            controller.signal.removeEventListener('abort', abortHandler);
+          }
+
+          if (controller.signal.aborted) {
+            setStatus('cancelled');
+            abortControllerRef.current = null;
+            return;
+          }
+
+          setStatus('success');
+          return;
         }
 
         const json = await res.json();
@@ -95,8 +151,8 @@ export function useAI<T>(options: UseAIOptions): UseAIReturn<T> {
         // No retries; surface a typed AITimeoutError immediately.
         // ----------------------------------------------------------------
         if (
-          err instanceof DOMException &&
-          err.name === 'TimeoutError'
+          (err as any)?.name === 'TimeoutError' ||
+          (typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'TimeoutError')
         ) {
           const timeoutErr = new AITimeoutError(timeoutMs!);
           setError(timeoutErr);
@@ -109,7 +165,12 @@ export function useAI<T>(options: UseAIOptions): UseAIReturn<T> {
         // ----------------------------------------------------------------
         // AbortError — triggered by cancel() or component unmount.
         // ----------------------------------------------------------------
-        if (err instanceof Error && err.name === 'AbortError') {
+        if (
+          (err as any)?.name === 'AbortError' ||
+          (err instanceof Error && err.name === 'AbortError') ||
+          (typeof DOMException !== 'undefined' && err instanceof DOMException && err.name === 'AbortError') ||
+          controller.signal.aborted
+        ) {
           setStatus('cancelled');
           abortControllerRef.current = null;
           return;
@@ -133,20 +194,23 @@ export function useAI<T>(options: UseAIOptions): UseAIReturn<T> {
         try {
           await delay(baseDelay * Math.pow(2, currentAttempt - 1), controller.signal);
         } catch (delayErr) {
-          if (delayErr instanceof DOMException && delayErr.name === 'AbortError') {
+          if (
+            (delayErr as any)?.name === 'AbortError' ||
+            (typeof DOMException !== 'undefined' && delayErr instanceof DOMException && delayErr.name === 'AbortError') ||
+            controller.signal.aborted
+          ) {
             setStatus('cancelled');
             abortControllerRef.current = null;
             return;
           }
         }
-      }
-      finally {
+      } finally {
         if (abortControllerRef.current === controller && currentAttempt > maxRetries) {
           abortControllerRef.current = null;
         }
       }
     }
-  }, [options.endpoint, options.retry, options.retryDelay, options.timeout, cancel]);
+  }, [options.endpoint, options.retry, options.retryDelay, options.timeout, options.streaming, cancel]);
 
   const reset = useCallback(() => {
     cancel();
@@ -162,6 +226,7 @@ export function useAI<T>(options: UseAIOptions): UseAIReturn<T> {
     error,
     status,
     isPending: status === 'pending',
+    isStreaming: status === 'streaming',
     isSuccess: status === 'success',
     isError: status === 'error',
     isCancelled: status === 'cancelled',

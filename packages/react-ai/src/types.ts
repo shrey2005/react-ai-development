@@ -1,10 +1,11 @@
-export type AIStatus = 'idle' | 'pending' | 'success' | 'error' | 'cancelled';
+export type AIStatus = 'idle' | 'pending' | 'streaming' | 'success' | 'error' | 'cancelled';
 
 export interface UseAIOptions {
   endpoint: string;
   retry?: number;
   retryDelay?: number;
   timeout?: number;
+  streaming?: boolean;
 }
 
 export interface UseAIReturn<T> {
@@ -12,6 +13,7 @@ export interface UseAIReturn<T> {
   error: Error | null;
   status: AIStatus;
   isPending: boolean;
+  isStreaming: boolean;
   isSuccess: boolean;
   isError: boolean;
   isCancelled: boolean;

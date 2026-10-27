@@ -1,6 +1,8 @@
 export class AITimeoutError extends Error {
+  timeoutMs: number;
   constructor(timeoutMs: number) {
-    super(`AI request timed out after ${timeoutMs}ms`);
+    super('TIMEOUT_ERROR');
     this.name = 'AITimeoutError';
+    this.timeoutMs = timeoutMs;
   }
 }
