@@ -1,12 +1,35 @@
 import { renderHook, act } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { useAI } from '../src/useAI';
+import { useAI, AITimeoutError, AIHttpError } from '../src/index';
 
-global.fetch = vi.fn();
+const mockedFetch = vi.fn();
+global.fetch = mockedFetch;
 
 describe('useAI Phase 1', () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+    });
+
+    it('exports all library symbols properly', () => {
+        expect(typeof useAI).toBe('function');
+        expect(typeof AITimeoutError).toBe('function');
+        expect(typeof AIHttpError).toBe('function');
+
+        const timeoutErr = new AITimeoutError(5000);
+        expect(timeoutErr).toBeInstanceOf(Error);
+        expect(timeoutErr).toBeInstanceOf(AITimeoutError);
+        expect(timeoutErr.timeoutMs).toBe(5000);
+        expect(timeoutErr.message).toBe('TIMEOUT_ERROR');
+
+        const httpErr = new AIHttpError(503);
+        expect(httpErr).toBeInstanceOf(Error);
+        expect(httpErr).toBeInstanceOf(AIHttpError);
+        expect(httpErr.status).toBe(503);
+        expect(httpErr.message).toBe('HTTP_ERROR: 503');
+    });
+
     it('transitions idle -> pending -> success', async () => {
-        (fetch as any).mockResolvedValueOnce({
+        mockedFetch.mockResolvedValueOnce({
             ok: true,
             json: async () => ({ data: 'Hello World' }),
         });
@@ -42,10 +65,7 @@ describe('useAI Phase 2', () => {
     });
 
     it('handle explicit cancellation', async () => {
-        let resolveFetch = null;
-        fetch.mockImplementationOnce(() => new Promise((resolve, reject) => {
-            resolveFetch = resolve;
-
+        mockedFetch.mockImplementationOnce(() => new Promise((_, reject) => {
             setTimeout(() => {
                 reject(new DOMException('Aborted', 'AbortError'));
             }, 100);
@@ -70,7 +90,7 @@ describe('useAI Phase 2', () => {
     });
 
     it('cancles pending request on unnmount', () => {
-        let abortSpy = vi.spyOn(AbortController.prototype, 'abort');
+        const abortSpy = vi.spyOn(AbortController.prototype, 'abort');
 
         const { result, unmount } = renderHook(() => useAI({ endpoint: '/api/ai' }));
 
@@ -90,10 +110,10 @@ describe('useAI Phase 3 retry', () => {
     });
 
     it('retires on 500 and succeed', async () => {
-        fetch.mockResolvedValueOnce({ ok: false, status: 500 }).mockResolvedValueOnce({ ok: true, json: async () => ({ data: 'Success' }) });
+        mockedFetch.mockResolvedValueOnce({ ok: false, status: 500 }).mockResolvedValueOnce({ ok: true, json: async () => ({ data: 'Success' }) });
         const { result } = renderHook(() => useAI({ endpoint: '/api/ai', retry: 1, retryDelay: 10 }));
 
-        let promise = null;
+        let promise: Promise<void> | null = null;
         act(() => {
             promise = result.current.generate('Hello');
         });
@@ -102,18 +122,18 @@ describe('useAI Phase 3 retry', () => {
             await promise;
         });
 
-        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(mockedFetch).toHaveBeenCalledTimes(2);
         expect(result.current.status).toBe('success');
         expect(result.current.retryAttempt).toBe(1);
         expect(result.current.data).toBe('Success');
     });
 
     it('exhausts retries and errors', async () => {
-        fetch.mockResolvedValue({ ok: false, status: 500 });
+        mockedFetch.mockResolvedValue({ ok: false, status: 500 });
 
         const { result } = renderHook(() => useAI({ endpoint: '/api/ai', retry: 2, retryDelay: 10 }));
 
-        let promise = null;
+        let promise: Promise<void> | null = null;
         act(() => {
             promise = result.current.generate('Hello');
         });
@@ -122,17 +142,17 @@ describe('useAI Phase 3 retry', () => {
             await promise;
         });
 
-        expect(fetch).toHaveBeenCalledTimes(3);
+        expect(mockedFetch).toHaveBeenCalledTimes(3);
         expect(result.current.status).toBe('error');
         expect(result.current.retryAttempt).toBe(2);
     });
 
     it('does not retry 400 client errors', async () => {
-        fetch.mockResolvedValue({ ok: false, status: 400 });
+        mockedFetch.mockResolvedValue({ ok: false, status: 400 });
 
         const { result } = renderHook(() => useAI({ endpoint: '/api/ai', retry: 2, retryDelay: 10 }));
 
-        let promise = null;
+        let promise: Promise<void> | null = null;
         act(() => {
             promise = result.current.generate('Hello');
         });
@@ -141,15 +161,15 @@ describe('useAI Phase 3 retry', () => {
             await promise;
         });
 
-        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(mockedFetch).toHaveBeenCalledTimes(1);
         expect(result.current.status).toBe('error');
         expect(result.current.retryAttempt).toBe(0);
     });
 
     it('aborts on timeout and skips retry', async () => {
-        fetch.mockImplementationOnce((_url: any, init: any) => new Promise((resolve, reject) => {
+        mockedFetch.mockImplementationOnce((_url: unknown, init: RequestInit) => new Promise((resolve, reject) => {
             init?.signal?.addEventListener('abort', () => {
-                reject(init.signal.reason || new DOMException('Timeout', 'TimeoutError'));
+                reject(new DOMException('Timeout', 'TimeoutError'));
             });
             setTimeout(() => {
                 resolve({ ok: true, json: async () => ({ data: 'Late' }) });
@@ -158,7 +178,7 @@ describe('useAI Phase 3 retry', () => {
 
         const { result } = renderHook(() => useAI({ endpoint: '/api/ai', retry: 2, timeout: 50 }));
 
-        let promise = null;
+        let promise: Promise<void> | null = null;
         act(() => {
             promise = result.current.generate('Hello');
         });
@@ -167,10 +187,38 @@ describe('useAI Phase 3 retry', () => {
             await promise;
         });
 
-        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(mockedFetch).toHaveBeenCalledTimes(1);
         expect(result.current.status).toBe('error');
         expect(result.current.error?.message).toBe('TIMEOUT_ERROR');
         expect(result.current.retryAttempt).toBe(0);
+    });
+
+    it('handles cancellation during backoff delay', async () => {
+        mockedFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+
+        const { result } = renderHook(() =>
+            useAI({ endpoint: '/api/ai', retry: 2, retryDelay: 500 })
+        );
+
+        act(() => {
+            result.current.generate('Backoff abort');
+        });
+
+        // Wait past initial fetch failure to enter retry delay
+        await act(async () => {
+            await new Promise(r => setTimeout(r, 50));
+        });
+
+        expect(result.current.retryAttempt).toBe(1);
+
+        // Cancel during backoff delay sleep
+        await act(async () => {
+            result.current.cancel();
+            await new Promise(r => setTimeout(r, 50));
+        });
+
+        expect(result.current.status).toBe('cancelled');
+        expect(result.current.isCancelled).toBe(true);
     });
 });
 
@@ -192,7 +240,7 @@ describe('useAI Phase 5 streaming', () => {
             }
         });
 
-        (fetch as any).mockResolvedValueOnce({
+        mockedFetch.mockResolvedValueOnce({
             ok: true,
             body: stream,
         });
@@ -204,7 +252,7 @@ describe('useAI Phase 5 streaming', () => {
         expect(result.current.status).toBe('idle');
         expect(result.current.isStreaming).toBe(false);
 
-        let promise = null;
+        let promise: Promise<void> | null = null;
         act(() => {
             promise = result.current.generate('Stream prompt');
         });
@@ -229,7 +277,7 @@ describe('useAI Phase 5 streaming', () => {
             }
         });
 
-        (fetch as any).mockResolvedValueOnce({
+        mockedFetch.mockResolvedValueOnce({
             ok: true,
             body: stream,
         });
@@ -238,7 +286,7 @@ describe('useAI Phase 5 streaming', () => {
             useAI({ endpoint: '/api/ai/generate', streaming: true })
         );
 
-        let promise = null;
+        let promise: Promise<void> | null = null;
         act(() => {
             promise = result.current.generate('Test incremental');
         });
@@ -279,7 +327,7 @@ describe('useAI Phase 5 streaming', () => {
             }
         });
 
-        (fetch as any).mockResolvedValueOnce({
+        mockedFetch.mockResolvedValueOnce({
             ok: true,
             body: stream,
         });
@@ -306,5 +354,57 @@ describe('useAI Phase 5 streaming', () => {
         expect(result.current.status).toBe('cancelled');
         expect(result.current.isCancelled).toBe(true);
         expect(result.current.isStreaming).toBe(false);
+    });
+
+    it('throws error when streaming response body is null', async () => {
+        mockedFetch.mockResolvedValueOnce({
+            ok: true,
+            body: null,
+        });
+
+        const { result } = renderHook(() =>
+            useAI({ endpoint: '/api/ai/generate', streaming: true })
+        );
+
+        let promise: Promise<void> | null = null;
+        act(() => {
+            promise = result.current.generate('Null body test');
+        });
+
+        await act(async () => {
+            await promise;
+        });
+
+        expect(result.current.status).toBe('error');
+        expect(result.current.error?.message).toBe('Response body is null');
+    });
+
+    it('handles unexpected reader stream errors', async () => {
+        const stream = new ReadableStream({
+            start(controller) {
+                controller.error(new Error('Stream broken'));
+            }
+        });
+
+        mockedFetch.mockResolvedValueOnce({
+            ok: true,
+            body: stream,
+        });
+
+        const { result } = renderHook(() =>
+            useAI({ endpoint: '/api/ai/generate', streaming: true })
+        );
+
+        let promise: Promise<void> | null = null;
+        act(() => {
+            promise = result.current.generate('Stream error test');
+        });
+
+        await act(async () => {
+            await promise;
+        });
+
+        expect(result.current.status).toBe('error');
+        expect(result.current.error?.message).toBe('Stream broken');
     });
 });

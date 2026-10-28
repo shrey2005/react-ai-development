@@ -1,4 +1,3 @@
-
 import { defineConfig } from 'tsup';
 
 export default defineConfig({
@@ -8,5 +7,7 @@ export default defineConfig({
   splitting: false,
   sourcemap: true,
   clean: true,
-  external: ['react', 'react-dom']
+  treeshake: true,
+  target: 'es2022',
+  external: ['react', 'react-dom'],
 });

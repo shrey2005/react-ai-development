@@ -5,6 +5,14 @@
     "packages/*",
     "apps/*"
   ],
+  "scripts": {
+    "build": "npm run build --workspace=packages/react-ai",
+    "test": "npm run test --workspace=packages/react-ai",
+    "test:coverage": "npm run test:coverage --workspace=packages/react-ai",
+    "typecheck": "npm run typecheck --workspace=packages/react-ai",
+    "lint": "npm run lint --workspace=packages/react-ai",
+    "pack:dry": "npm pack --dry-run --workspace=packages/react-ai"
+  },
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
     "jsdom": "^29.1.1"

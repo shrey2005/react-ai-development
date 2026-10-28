@@ -1,33 +1,71 @@
 {
   "name": "@shrey/react-ai",
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "description": "Production-ready React hook for AI stream handling, exponential backoff retries, and lifecycle state management.",
   "type": "module",
-  "main": "./dist/index.js",
-  "module": "./dist/index.mjs",
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "require": "./dist/index.js",
-      "import": "./dist/index.mjs",
-      "types": "./dist/index.d.ts"
-    }
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./package.json": "./package.json"
   },
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
+  "sideEffects": false,
   "scripts": {
     "build": "tsup",
     "dev": "tsup --watch",
     "lint": "eslint src/",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "prepack": "npm run build"
   },
   "peerDependencies": {
     "react": "^18.0.0 || ^19.0.0",
     "react-dom": "^18.0.0 || ^19.0.0"
   },
+  "peerDependenciesMeta": {
+    "react-dom": {
+      "optional": true
+    }
+  },
   "devDependencies": {
+    "@eslint/js": "^9.20.0",
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
+    "@vitest/coverage-v8": "^1.5.0",
+    "eslint": "^9.20.0",
     "tsup": "^8.0.2",
     "typescript": "^5.4.5",
+    "typescript-eslint": "^8.24.0",
     "vitest": "^1.5.0"
-  }
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "keywords": [
+    "react",
+    "react-hook",
+    "ai",
+    "llm",
+    "streaming",
+    "retry",
+    "backoff",
+    "typescript"
+  ],
+  "license": "MIT",
+  "author": "Shrey"
 }

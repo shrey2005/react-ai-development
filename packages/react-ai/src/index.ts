@@ -1,3 +1,3 @@
 export { useAI } from './useAI';
 export type { AIStatus, UseAIOptions, UseAIReturn } from './types';
-export { AITimeoutError } from './errors';
+export { AITimeoutError, AIHttpError } from './errors';
