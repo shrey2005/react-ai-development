@@ -1,6 +1,6 @@
 {
   "name": "@shreygajjar2005/react-ai",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Production-ready React hook for AI stream handling, exponential backoff retries, and lifecycle state management.",
   "type": "module",
   "main": "./dist/index.cjs",
