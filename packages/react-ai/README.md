@@ -1,4 +1,4 @@
-# @shrey/react-ai
+# @shreygajjar2005/react-ai
 
 [![npm version](https://img.shields.io/npm/v/@shrey/react-ai.svg?style=flat-square)](https://www.npmjs.com/package/@shrey/react-ai)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](https://opensource.org/licenses/MIT)
@@ -23,7 +23,7 @@ Production-grade, zero-dependency React hook for managing AI/LLM request lifecyc
 
 ## Architecture
 
-The following diagram illustrates how `@shrey/react-ai` orchestrates network requests, stream decoding, retries, and state transitions within your React application:
+The following diagram illustrates how `@shreygajjar2005/react-ai` orchestrates network requests, stream decoding, retries, and state transitions within your React application:
 
 ```mermaid
 flowchart TD
@@ -76,13 +76,13 @@ stateDiagram-v2
 
 ```bash
 # npm
-npm install @shrey/react-ai
+npm install @shreygajjar2005/react-ai
 
 # pnpm
-pnpm add @shrey/react-ai
+pnpm add @shreygajjar2005/react-ai
 
 # yarn
-yarn add @shrey/react-ai
+yarn add @shreygajjar2005/react-ai
 ```
 
 ### Peer Dependencies
@@ -141,7 +141,7 @@ export function ChatComponent() {
 
 ```tsx
 import React, { useState } from 'react';
-import { useAI } from '@shrey/react-ai';
+import { useAI } from '@shreygajjar2005/react-ai';
 
 export function StreamingChat() {
   const [prompt, setPrompt] = useState('');
@@ -234,7 +234,7 @@ The library provides distinct typed error classes for deterministic error handli
 Thrown when request execution exceeds the duration specified in `options.timeout`.
 
 ```ts
-import { useAI, AITimeoutError } from '@shrey/react-ai';
+import { useAI, AITimeoutError } from '@shreygajjar2005/react-ai';
 
 const { error, isTimeout } = useAI({
   endpoint: '/api/ai',
@@ -251,7 +251,7 @@ if (error instanceof AITimeoutError) {
 Thrown when the server responds with a non-2xx HTTP status code.
 
 ```ts
-import { useAI, AIHttpError } from '@shrey/react-ai';
+import { useAI, AIHttpError } from '@shreygajjar2005/react-ai';
 
 const { error } = useAI({ endpoint: '/api/ai' });
 
@@ -264,7 +264,7 @@ if (error instanceof AIHttpError) {
 
 ## Distribution & Build Verification
 
-`@shrey/react-ai` is built using `tsup` and complies with Modern Node.js Module Resolution (Node16 / NodeNext / Bundler).
+`@shreygajjar2005/react-ai` is built using `tsup` and complies with Modern Node.js Module Resolution (Node16 / NodeNext / Bundler).
 
 - **ESM Entry**: `dist/index.js`
 - **CommonJS Entry**: `dist/index.cjs`

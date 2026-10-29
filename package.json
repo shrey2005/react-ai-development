@@ -13,6 +13,9 @@
     "lint": "npm run lint --workspace=packages/react-ai",
     "pack:dry": "npm pack --dry-run --workspace=packages/react-ai"
   },
+  "dependencies": {
+    "@shreygajjar2005/react-ai": "workspace:*"
+  },  
   "devDependencies": {
     "@testing-library/react": "^16.3.3",
     "jsdom": "^29.1.1"

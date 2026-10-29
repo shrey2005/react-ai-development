@@ -1,5 +1,5 @@
 {
-  "name": "@shrey/react-ai",
+  "name": "@shreygajjar2005/react-ai",
   "version": "1.0.0",
   "description": "Production-ready React hook for AI stream handling, exponential backoff retries, and lifecycle state management.",
   "type": "module",
