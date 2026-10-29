@@ -106,7 +106,7 @@ Ensure your project has `react` installed:
 
 ```tsx
 import React, { useState } from 'react';
-import { useAI } from '@shrey/react-ai';
+import { useAI } from '@shreygajjar2005/react-ai';
 
 export function ChatComponent() {
   const [prompt, setPrompt] = useState('');
